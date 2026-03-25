@@ -387,7 +387,10 @@ static int varlink_idl_format_symbol(
 
                 /* Sooner or later we want to export this in a proper IDL language construct, see
                  * https://github.com/varlink/varlink.github.io/issues/26 – but for now export this as a
-                 * comment. */
+                 * comment.
+                 *
+                 * Until this is resolved upsteam, consider this comment part of the API (i.e. don't change
+                 * only extend). It is used by tools like varlink-http-bridge. */
                 if ((symbol->symbol_flags & (SD_VARLINK_REQUIRES_MORE|SD_VARLINK_SUPPORTS_MORE)) != 0) {
                         fputs(colors[COLOR_COMMENT], f);
                         if (FLAGS_SET(symbol->symbol_flags, SD_VARLINK_REQUIRES_MORE))
@@ -1705,7 +1708,12 @@ static int varlink_idl_validate_symbol(const sd_varlink_symbol *symbol, sd_json_
 static int varlink_idl_validate_field_element_type(const sd_varlink_field *field, sd_json_variant *v) {
         assert(field);
         assert(v);
-        assert(!sd_json_variant_is_null(v));
+
+        if (sd_json_variant_is_null(v))
+                return varlink_idl_log(
+                                SYNTHETIC_ERRNO(EMEDIUMTYPE),
+                                "Field '%s' element is null, refusing.",
+                                strna(field->name));
 
         switch (field->field_type) {
 
@@ -1767,7 +1775,7 @@ static int varlink_idl_validate_field_element_type(const sd_varlink_field *field
 
         case SD_VARLINK_ANY:
                 /* The any type accepts any non-null JSON value, no validation needed. (Note that null is
-                 * already handled by the caller.) */
+                 * already gracefully rejected at the start of this function.) */
                 break;
 
         case _SD_VARLINK_FIELD_COMMENT:
